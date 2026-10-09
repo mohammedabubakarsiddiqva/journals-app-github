@@ -1,0 +1,7 @@
+{
+  "name": "journals",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A private journaling app: Supabase auth + database, hosted on Vercel.",
+  "engines": { "node": ">=18" }
+}
