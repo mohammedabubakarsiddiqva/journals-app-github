@@ -1814,12 +1814,19 @@ paintHlColor();
 // highlighter "pen" mode: select text and it is highlighted with the default colour
 document.getElementById("editor").addEventListener("mouseup",()=>{if(!hlMode)return;setTimeout(()=>{if(selectionInEditor())highlightSelection(true)},0)});
 document.getElementById("editor").addEventListener("keyup",e=>{if(hlMode&&e.key==="Shift"&&selectionInEditor())highlightSelection(true)});
+/* remember the last caret / selection inside the editor (survives the editor losing focus, e.g. on phones) */
+let lastEditorRange=null;
+document.addEventListener("selectionchange",()=>{
+ const ed=document.getElementById("editor"),s=window.getSelection();
+ if(s&&s.rangeCount&&ed.contains(s.getRangeAt(0).commonAncestorContainer))lastEditorRange=s.getRangeAt(0).cloneRange();
+});
 /* Quote tool: converts the block(s) in place and keeps the caret exactly where it was */
 function toggleQuote(){
  const editor=document.getElementById("editor");
  const sel=window.getSelection();
  let range=null;
  if(sel&&sel.rangeCount&&editor.contains(sel.getRangeAt(0).commonAncestorContainer))range=sel.getRangeAt(0).cloneRange();
+ else if(lastEditorRange&&editor.contains(lastEditorRange.commonAncestorContainer)&&editor.contains(lastEditorRange.startContainer)&&editor.contains(lastEditorRange.endContainer))range=lastEditorRange.cloneRange();
  else if(typeof savedSelectionRange!=="undefined"&&savedSelectionRange&&editor.contains(savedSelectionRange.commonAncestorContainer))range=savedSelectionRange.cloneRange();
  if(document.activeElement!==editor)editor.focus({preventScroll:true});
  if(!editor.firstChild){editor.innerHTML="<blockquote><br></blockquote>"}
