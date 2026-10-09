@@ -302,6 +302,40 @@ body.locked .app,body.locked .workspace-toggle{visibility:hidden}
 .user-row button{border:1px solid #dcc69f;background:#f5ead5;color:#74552f;border-radius:7px;padding:5px 9px;font-size:10px;white-space:nowrap}.user-row button:hover{background:#ead9bb}
 #logoutTop{display:none}
 @media(max-width:760px){#logoutTop{display:block}}
+
+/* ===== v34: phone layout (drawers) ===== */
+.modalbg{z-index:1200}
+#navBtn,#workBtn{display:none}
+.drawer-backdrop{display:none}
+@media(max-width:760px){
+ html,body{overflow:hidden;height:100%}
+ .app{display:block;height:100dvh;padding:0;overflow:hidden}
+ .editor{height:100dvh;border-radius:0;border:0;min-height:0}
+ .divider,.workspace-toggle,#fullBtn{display:none!important}
+ #navBtn,#workBtn{display:grid;place-items:center;flex:none}
+ .top{height:56px;padding:0 12px;gap:6px}.date-main{font-size:15px}.date-sub{font-size:9px;margin-top:2px}
+ .ico{width:36px;height:36px}
+ .toolbar{padding:6px 8px;gap:4px}
+ .toolgroup{padding:2px}
+ .toolbar-words{height:34px;padding:0 9px;margin-left:0}
+ .canvas{padding:20px 16px 80px}
+ #title{font-size:26px;margin:6px 0 14px}
+ #editor{font-size:16px}
+ .words{font-size:10px}
+ /* sidebar + workspace become slide-over drawers */
+ .app .sidebar,.app .right{display:flex;position:fixed;top:0;bottom:0;z-index:900;width:min(88vw,330px);max-width:none;border-radius:0;
+  transition:transform .38s cubic-bezier(.22,.8,.25,1),box-shadow .3s;box-shadow:none;opacity:1;visibility:visible;pointer-events:auto;padding-left:13px;padding-right:13px}
+ .app .sidebar{left:0;transform:translateX(-104%);border-radius:0 18px 18px 0;background:#fbf7ef}
+ .app .right{right:0;display:block;transform:translateX(104%);border-radius:18px 0 0 18px;background:#fbf7ef;overflow-y:auto;overflow-x:hidden;padding-top:16px}
+ .app .right>*{width:auto}
+ .app.nav-open .sidebar{transform:none;box-shadow:0 0 60px rgba(40,25,10,.35)}
+ .app.work-open .right{transform:none;box-shadow:0 0 60px rgba(40,25,10,.35)}
+ .drawer-backdrop{display:block;position:fixed;inset:0;z-index:850;background:rgba(46,31,18,.4);opacity:0;visibility:hidden;transition:opacity .3s ease,visibility 0s linear .3s}
+ .app.nav-open~.drawer-backdrop,.app.work-open~.drawer-backdrop{opacity:1;visibility:visible;transition:opacity .3s ease}
+ .entry-delete{opacity:.8}
+ .selection-popover{max-width:92vw}
+ .modal{padding:16px}
+}
 </style>
 </head>
 <body class="locked">
@@ -349,7 +383,9 @@ body.locked .app,body.locked .workspace-toggle{visibility:hidden}
 
  <main class="panel editor">
   <div class="top">
+   <button class="ico" id="navBtn" type="button" title="Journal history" aria-label="Open journal history">☰</button>
    <div class="date"><div class="date-main" id="dateMain"></div><div class="date-sub" id="dateSub"></div></div>
+   <button class="ico" id="workBtn" type="button" title="Templates and tools" aria-label="Open templates and tools">✦</button>
    <button class="ico" id="starBtn" title="Favorite">☆</button>
    <button class="ico" id="fullBtn" title="Full screen">⛶</button>
    <button class="ico" id="logoutTop" title="Sign out" aria-label="Sign out">⎋</button>
@@ -435,6 +471,7 @@ body.locked .app,body.locked .workspace-toggle{visibility:hidden}
  </aside>
 </div>
 
+<div class="drawer-backdrop" id="drawerBackdrop"></div>
 <div class="auth" id="auth" role="dialog" aria-modal="true" aria-label="Sign in to Journals">
  <div class="auth-card">
   <div class="auth-brand"><span class="brandmark">◒</span><h1>Journals</h1></div>
@@ -605,6 +642,7 @@ function friendlyAuthError(err){
  if(/already registered|already been registered/i.test(m))return "An account with this email already exists. Try signing in instead.";
  if(/rate limit|too many/i.test(m))return "Too many attempts. Please wait a minute and try again.";
  if(/password should be|weak/i.test(m))return m;
+ if(/not valid JSON|Unexpected token|<!DOCTYPE/i.test(m))return "Can’t reach your Supabase project. SUPABASE_URL in Vercel must be exactly your Project URL (https://xxxx.supabase.co), then redeploy.";
  if(/fetch|network/i.test(m))return "Can’t reach the server. Check your internet connection.";
  return m;
 }
@@ -711,6 +749,14 @@ async function initApp(){
   },0);
  });
 }
+function closeDrawers(){const a=document.getElementById("app");a.classList.remove("nav-open","work-open")}
+document.getElementById("navBtn").onclick=()=>{const a=document.getElementById("app");a.classList.remove("work-open");a.classList.toggle("nav-open")};
+document.getElementById("workBtn").onclick=()=>{const a=document.getElementById("app");a.classList.remove("nav-open");a.classList.toggle("work-open")};
+document.getElementById("drawerBackdrop").onclick=closeDrawers;
+document.getElementById("entries").addEventListener("click",e=>{if(e.target.closest("[data-entry]")&&!e.target.closest("[data-star],[data-delete],[data-select]"))closeDrawers()});
+["newEntry","calendarView","duplicate","trash"].forEach(i=>document.getElementById(i).addEventListener("click",()=>setTimeout(closeDrawers,0)));
+window.addEventListener("resize",()=>{if(innerWidth>760)closeDrawers()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawers()});
 $a("logoutBtn").onclick=signOut;$a("logoutTop").onclick=signOut;
 
 function id(){return Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8)}
