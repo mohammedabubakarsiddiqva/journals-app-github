@@ -1814,11 +1814,64 @@ paintHlColor();
 // highlighter "pen" mode: select text and it is highlighted with the default colour
 document.getElementById("editor").addEventListener("mouseup",()=>{if(!hlMode)return;setTimeout(()=>{if(selectionInEditor())highlightSelection(true)},0)});
 document.getElementById("editor").addEventListener("keyup",e=>{if(hlMode&&e.key==="Shift"&&selectionInEditor())highlightSelection(true)});
-document.getElementById("quote").onclick=()=>{
- const sel=window.getSelection();let n=sel&&sel.rangeCount?sel.anchorNode:null;if(n&&n.nodeType===3)n=n.parentElement;
- const inQuote=n&&n.closest&&n.closest("#editor blockquote");
- block(inQuote?"p":"blockquote");syncActiveTools();
-};
+/* Quote tool: converts the block(s) in place and keeps the caret exactly where it was */
+function toggleQuote(){
+ const editor=document.getElementById("editor");
+ const sel=window.getSelection();
+ let range=null;
+ if(sel&&sel.rangeCount&&editor.contains(sel.getRangeAt(0).commonAncestorContainer))range=sel.getRangeAt(0).cloneRange();
+ else if(typeof savedSelectionRange!=="undefined"&&savedSelectionRange&&editor.contains(savedSelectionRange.commonAncestorContainer))range=savedSelectionRange.cloneRange();
+ if(document.activeElement!==editor)editor.focus({preventScroll:true});
+ if(!editor.firstChild){editor.innerHTML="<blockquote><br></blockquote>"}
+ else if(!range){range=document.createRange();range.selectNodeContents(editor.lastChild);range.collapse(false)}
+ if(!range){const q=editor.firstChild;range=document.createRange();range.selectNodeContents(q);range.collapse(true)}
+ const BLOCKS=/^(P|DIV|H1|H2|H3|H4|H5|H6|BLOCKQUOTE)$/;
+ /* top-level blocks touched by the selection */
+ const targets=[];
+ [...editor.childNodes].forEach(n=>{
+  if(!range.intersectsNode(n))return;
+  if(n.nodeType===3){if(n.nodeValue.trim()||range.startContainer===n)targets.push(n);return}
+  if(n.nodeType===1&&BLOCKS.test(n.tagName)&&!n.classList.contains("todo"))targets.push(n);
+ });
+ if(!targets.length){editor.focus();return}
+ const allQuotes=targets.every(n=>n.nodeType===1&&n.tagName==="BLOCKQUOTE");
+ let {startContainer:sc,startOffset:so,endContainer:ec,endOffset:eo}=range;
+ const remap=(map)=>{ if(map.has(sc))sc=map.get(sc); if(map.has(ec))ec=map.get(ec); };
+ targets.forEach(n=>{
+  const map=new Map();
+  if(allQuotes){
+   const hasBlockKids=[...n.children].some(c=>BLOCKS.test(c.tagName));
+   if(hasBlockKids){
+    /* unwrap: children stay in place, so the selection nodes stay valid */
+    const parent=n.parentNode;
+    if(sc===n){const kid=n.childNodes[Math.min(so,n.childNodes.length-1)];sc=kid;so=0}
+    if(ec===n){const kid=n.childNodes[Math.max(0,Math.min(eo,n.childNodes.length)-1)];ec=kid;eo=kid.nodeType===3?kid.length:kid.childNodes.length}
+    while(n.firstChild)parent.insertBefore(n.firstChild,n);
+    n.remove();
+   }else{
+    const p=document.createElement("p");
+    while(n.firstChild)p.appendChild(n.firstChild);
+    if(!p.firstChild)p.appendChild(document.createElement("br"));
+    n.replaceWith(p);map.set(n,p);remap(map);
+   }
+  }else if(n.nodeType===3){
+   const q=document.createElement("blockquote");
+   n.replaceWith(q);q.appendChild(n);
+  }else if(n.tagName!=="BLOCKQUOTE"){
+   const q=document.createElement("blockquote");
+   while(n.firstChild)q.appendChild(n.firstChild);
+   if(!q.firstChild)q.appendChild(document.createElement("br"));
+   n.replaceWith(q);map.set(n,q);remap(map);
+  }
+ });
+ /* put the caret / selection back exactly where it was */
+ try{
+  const r=document.createRange();r.setStart(sc,so);r.setEnd(ec,eo);
+  sel.removeAllRanges();sel.addRange(r);
+ }catch(e){placeCaretAtEnd(editor.lastChild||editor)}
+ saveCurrent();syncActiveTools();
+}
+document.getElementById("quote").onclick=toggleQuote;
 /* custom dropdowns */
 function closeDropdowns(except){document.querySelectorAll(".dd.open").forEach(d=>{if(d!==except){d.classList.remove("open");d.querySelector(".dd-btn").setAttribute("aria-expanded","false")}})}
 document.querySelectorAll(".dd").forEach(dd=>{
